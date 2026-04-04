@@ -70,12 +70,12 @@ func handleExport(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 
 		for _, rec := range recordings {
 			kwID := rec.GetString("keyword")
-			lang := rec.GetString("language")
+			recLang := rec.GetString("language")
 			kwEn := ""
 			kwDisplay := ""
 			if kw, kerr := app.FindRecordById("keywords", kwID); kerr == nil {
-				kwEn = kw.GetString("text") // canonical English label
-				switch lang {
+				kwEn = kw.GetString("text")
+				switch recLang {
 				case "si":
 					kwDisplay = kw.GetString("text_si")
 				case "ta":
@@ -85,32 +85,35 @@ func handleExport(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 				}
 			}
 
-			// Prefer processed WAV; fall back to original audio
+			// audio_wav is a TextField (plain filename set by batch processor).
+			// audio is a FileField — use GetStringSlice and take the first entry.
 			audioFilename := rec.GetString("audio_wav")
 			if audioFilename == "" {
-				audioFilename = rec.GetString("audio")
+				if files := rec.GetStringSlice("audio"); len(files) > 0 {
+					audioFilename = files[0]
+				}
 			}
-			if audioFilename == "" {
-				continue
-			}
 
-			audioPath := filepath.Join(
-				app.DataDir(), "storage",
-				rec.Collection().Id,
-				rec.Id,
-				audioFilename,
-			)
-
-			zipEntryName := fmt.Sprintf("audio/%s/%s_%s",
-				rec.GetString("language"), rec.Id, audioFilename)
-
-			if err := addFileToZip(zw, audioPath, zipEntryName); err != nil {
-				zipEntryName = "(file missing)"
+			// Always write the CSV row; mark audio as pending if not yet available.
+			zipEntryName := ""
+			if audioFilename != "" {
+				audioPath := filepath.Join(
+					app.DataDir(), "storage",
+					rec.Collection().Id,
+					rec.Id,
+					audioFilename,
+				)
+				zipEntryName = fmt.Sprintf("audio/%s/%s_%s", recLang, rec.Id, audioFilename)
+				if err := addFileToZip(zw, audioPath, zipEntryName); err != nil {
+					zipEntryName = "(file missing: " + audioFilename + ")"
+				}
+			} else {
+				zipEntryName = "(pending ffmpeg processing)"
 			}
 
 			_ = cw.Write([]string{
 				rec.Id,
-				lang,
+				recLang,
 				kwID,
 				kwEn,
 				kwDisplay,

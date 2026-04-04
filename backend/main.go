@@ -89,17 +89,29 @@ func getClientIP(r *http.Request) string {
 	return r.RemoteAddr
 }
 
+// ── Daily batch scheduler ─────────────────────────────────────────────────────
+
+// scheduleDailyProcessing fires at midnight UTC every day.
+func scheduleDailyProcessing(app *pocketbase.PocketBase) {
+	for {
+		now := time.Now().UTC()
+		next := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, time.UTC)
+		time.Sleep(time.Until(next))
+		log.Println("batch processor: starting daily run")
+		processBatch(app)
+	}
+}
+
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 func main() {
 	app := pocketbase.New()
 
-	// Auto-migrate on start
 	migratecmd.MustRegister(app, app.RootCmd, migratecmd.Config{
 		Automigrate: true,
 	})
 
-	rl := newRateLimiter(20, time.Minute) // 20 recordings/min/IP
+	rl := newRateLimiter(20, time.Minute)
 
 	// Rate-limit recording creation
 	app.OnRecordCreateRequest("recordings").BindFunc(func(e *core.RecordRequestEvent) error {
@@ -110,9 +122,8 @@ func main() {
 		return e.Next()
 	})
 
-	// Post-create: process audio with ffmpeg
+	// Update keyword counts after each new recording
 	app.OnRecordAfterCreateSuccess("recordings").BindFunc(func(e *core.RecordEvent) error {
-		go processAudio(app, e.Record)
 		go updateKeywordCount(app, e.Record)
 		return e.Next()
 	})
@@ -120,23 +131,24 @@ func main() {
 	// Register custom routes
 	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
 		se.Router.GET("/api/export", handleExport(app))
-		se.Router.POST("/api/seed", handleSeed(app))
 		se.Router.GET("/api/stats", handleStats(app))
+		se.Router.POST("/api/seed", handleSeed(app))
+		se.Router.POST("/api/process", handleProcess(app))
 		return se.Next()
 	})
 
-	// Seed database on first run
+	// Seed + start batch scheduler after PocketBase is ready
 	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
 		go func() {
 			time.Sleep(2 * time.Second)
 			if err := seedIfEmpty(app); err != nil {
-				log.Printf("Seed error: %v", err)
+				log.Printf("seed error: %v", err)
 			}
+			go scheduleDailyProcessing(app)
 		}()
 		return se.Next()
 	})
 
-	// Override serve address from env
 	port := os.Getenv("PB_PORT")
 	if port == "" {
 		port = "10001"

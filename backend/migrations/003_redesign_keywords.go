@@ -63,12 +63,9 @@ func init() {
 					"audio/mp4", "audio/mpeg",
 				},
 			},
-			&core.FileField{
-				Name:      "audio_wav",
-				MaxSelect: 1,
-				MaxSize:   52428800,
-				MimeTypes: []string{"audio/wav", "audio/x-wav"},
-			},
+			// Filename only — WAV is written directly to storage by ffmpeg hook,
+		// bypassing PocketBase's upload mechanism.
+		&core.TextField{Name: "audio_wav"},
 			&core.NumberField{Name: "duration", Min: floatPtr(0)},
 			&core.BoolField{Name: "validated"},
 			&core.TextField{Name: "client_ip"},

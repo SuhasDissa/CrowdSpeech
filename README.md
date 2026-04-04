@@ -102,10 +102,25 @@ cd backend && go run ./cmd/genhash "yourpassword"
 | GET    | `/api/stats`                                  | Contribution statistics          |
 
 ### Admin (requires `X-Admin-Password` header or `?password=` query)
-| Method | Path                                          | Description                      |
-|--------|-----------------------------------------------|----------------------------------|
-| GET    | `/api/export?language=en`                     | Download ZIP of audio + CSV      |
-| POST   | `/api/seed`                                   | Re-seed keywords (idempotent)    |
+| Method | Path                                          | Description                                        |
+|--------|-----------------------------------------------|----------------------------------------------------|
+| GET    | `/api/export?language=en`                     | Download ZIP of audio + CSV                        |
+| POST   | `/api/seed`                                   | Re-seed keywords (idempotent)                      |
+| POST   | `/api/process`                                | Trigger ffmpeg batch processing immediately        |
+
+## Audio Processing
+
+ffmpeg runs as a **nightly batch job** (midnight UTC) rather than inline on each upload. This avoids blocking the API and lets ffmpeg jobs accumulate before processing.
+
+- Converts original WebM/OGG uploads → 16kHz 16-bit mono WAV
+- Applies EBU R128 loudness normalisation and silence trimming
+- Up to 4 recordings processed in parallel per batch run
+- A second batch run won't start if one is already in progress
+
+To trigger processing immediately:
+```bash
+curl -X POST -H "X-Admin-Password: yourpassword" http://localhost/api/process
+```
 
 ### Example export
 ```bash
