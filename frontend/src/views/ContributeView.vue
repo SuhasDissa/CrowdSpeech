@@ -37,9 +37,16 @@
           {{ keywordText(store.currentKeyword, language) }}
         </div>
 
-        <!-- Category pill -->
-        <div class="category-pill" v-if="store.currentKeyword.category">
-          {{ store.currentKeyword.category }}
+        <!-- Category + recording count -->
+        <div class="keyword-meta">
+          <span class="category-pill" v-if="store.currentKeyword.category">
+            {{ store.currentKeyword.category }}
+          </span>
+          <span class="recorded-count" :title="`Target: ${store.currentKeyword.sample_target}`">
+            <span class="mdi mdi-account-voice" />
+            {{ keywordCount(store.currentKeyword, language) }}
+            / {{ store.currentKeyword.sample_target }}
+          </span>
         </div>
 
         <!-- Waveform -->
@@ -139,7 +146,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { LANGUAGES, type Language } from '@/stores/language'
-import { useRecordingStore, keywordText } from '@/stores/recording'
+import { useRecordingStore, keywordText, keywordCount } from '@/stores/recording'
 import WaveformDisplay from '@/components/WaveformDisplay.vue'
 
 const props = defineProps<{ language: string }>()
@@ -460,6 +467,15 @@ watch(() => store.phase, (p) => {
   width: 100%;
 }
 
+.keyword-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
 .category-pill {
   font-size: 0.7rem;
   font-weight: 700;
@@ -468,7 +484,18 @@ watch(() => store.phase, (p) => {
   color: #666;
   border: 1px solid #ccc;
   padding: 0.2rem 0.6rem;
-  margin-bottom: 1.5rem;
+}
+
+.recorded-count {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: #000;
+  border: 1px solid #000;
+  padding: 0.2rem 0.6rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
 }
 
 /* Waveform */

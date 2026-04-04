@@ -18,6 +18,13 @@ export type RecordingPhase = 'idle' | 'recording' | 'reviewing' | 'submitting' |
 
 const API_BASE = '/api'
 
+/** Returns the number of recordings already collected for this keyword+language */
+export function keywordCount(kw: Keyword, lang: Language): number {
+  if (lang === 'si') return kw.count_si
+  if (lang === 'ta') return kw.count_ta
+  return kw.count_en
+}
+
 /** Returns the display text for a keyword in the given language */
 export function keywordText(kw: Keyword, lang: Language): string {
   if (lang === 'si') return kw.text_si || kw.text
@@ -46,17 +53,19 @@ export const useRecordingStore = defineStore('recording', () => {
 
   async function fetchNextKeyword(language: Language): Promise<void> {
     try {
-      // Fetch the keyword with the lowest count for this language
       const sortField = countField(language)
-      // Also filter out keywords with no display text for the chosen language
       const langFilter = language === 'si'
         ? 'text_si != ""'
         : language === 'ta'
         ? 'text_ta != ""'
         : 'text != ""'
 
+      // Fetch the 20 least-recorded keywords, then pick one at random.
+      // This gives even distribution while avoiding everyone seeing the same
+      // word simultaneously.
       const resp = await fetch(
-        `${API_BASE}/collections/keywords/records?filter=${encodeURIComponent(langFilter)}&sort=${sortField}&perPage=1`,
+        `${API_BASE}/collections/keywords/records` +
+        `?filter=${encodeURIComponent(langFilter)}&sort=${sortField}&perPage=20`,
         { headers: { 'Content-Type': 'application/json' } }
       )
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
@@ -64,7 +73,11 @@ export const useRecordingStore = defineStore('recording', () => {
       if (!data.items || data.items.length === 0) {
         throw new Error('No keywords available')
       }
-      currentKeyword.value = data.items[0] as Keyword
+
+      // Avoid showing the same word twice in a row
+      const pool = (data.items as Keyword[]).filter(k => k.id !== currentKeyword.value?.id)
+      const candidates = pool.length > 0 ? pool : data.items as Keyword[]
+      currentKeyword.value = candidates[Math.floor(Math.random() * candidates.length)]
     } catch (e) {
       errorMessage.value = e instanceof Error ? e.message : 'Failed to fetch keyword'
       phase.value = 'error'
