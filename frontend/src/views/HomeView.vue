@@ -76,9 +76,11 @@ import { onMounted, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { LANGUAGES, type Language } from '@/stores/language'
 import { useRecordingStore } from '@/stores/recording'
+import { useSurveyStore } from '@/stores/survey'
 
 const router = useRouter()
 const recordingStore = useRecordingStore()
+const surveyStore = useSurveyStore()
 
 const languages = Object.values(LANGUAGES)
 const totalContributions = recordingStore.totalContributions
@@ -95,14 +97,19 @@ const showPhoneNudge = computed(() => {
 
 const steps = [
   'Choose your language above',
+  'Answer a short survey (saved for future visits)',
   'Read the product name shown on screen',
   'Press the big square button (or Space) to record',
   'Listen back, then Submit — or Redo',
-  'Automatically advance to the next word',
 ]
 
 function selectLanguage(code: string) {
-  router.push({ name: 'contribute', params: { language: code as Language } })
+  // Skip survey if already completed
+  if (surveyStore.completed) {
+    router.push({ name: 'contribute', params: { language: code as Language } })
+  } else {
+    router.push({ name: 'survey', params: { language: code as Language } })
+  }
 }
 
 onMounted(() => {

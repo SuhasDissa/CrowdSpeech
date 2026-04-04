@@ -10,6 +10,12 @@ const router = createRouter({
       component: HomeView,
     },
     {
+      path: '/survey/:language',
+      name: 'survey',
+      component: () => import('@/views/SurveyView.vue'),
+      props: true,
+    },
+    {
       path: '/contribute/:language',
       name: 'contribute',
       component: () => import('@/views/ContributeView.vue'),

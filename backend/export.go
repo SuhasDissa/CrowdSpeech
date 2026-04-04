@@ -66,7 +66,12 @@ func handleExport(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 			return err
 		}
 		cw := csv.NewWriter(csvFile)
-		_ = cw.Write([]string{"id", "language", "keyword_id", "keyword_en", "keyword_display", "audio_file", "duration", "created"})
+		_ = cw.Write([]string{
+			"id", "language", "keyword_id", "keyword_en", "keyword_display",
+			"audio_file", "duration", "created",
+			"age_group", "gender", "country", "primary_language", "accent",
+			"region", "education", "years_speaking", "occupation", "speech_condition",
+		})
 
 		for _, rec := range recordings {
 			kwID := rec.GetString("keyword")
@@ -120,6 +125,16 @@ func handleExport(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 				zipEntryName,
 				fmt.Sprintf("%.2f", rec.GetFloat("duration")),
 				rec.GetDateTime("created").String(),
+				rec.GetString("age_group"),
+				rec.GetString("gender"),
+				rec.GetString("country"),
+				rec.GetString("primary_language"),
+				rec.GetString("accent"),
+				rec.GetString("region"),
+				rec.GetString("education"),
+				rec.GetString("years_speaking"),
+				rec.GetString("occupation"),
+				rec.GetString("speech_condition"),
 			})
 		}
 

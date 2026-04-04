@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { Language } from './language'
+import { useSurveyStore } from './survey'
 
 export interface Keyword {
   id: string
@@ -108,12 +109,26 @@ export const useRecordingStore = defineStore('recording', () => {
     errorMessage.value = ''
 
     try {
+      const surveyStore = useSurveyStore()
       const formData = new FormData()
       const ext = audioBlob.value.type.includes('ogg') ? 'ogg' : 'webm'
       formData.append('audio', audioBlob.value, `recording.${ext}`)
       formData.append('language', language)
       formData.append('keyword', currentKeyword.value.id)
       formData.append('duration', String(duration.value))
+
+      // Append survey demographics
+      const s = surveyStore.answers
+      formData.append('age_group', s.age_group)
+      formData.append('gender', s.gender)
+      formData.append('country', s.country)
+      formData.append('primary_language', s.primary_language)
+      formData.append('accent', s.accent)
+      formData.append('region', s.region)
+      formData.append('education', s.education)
+      formData.append('years_speaking', s.years_speaking)
+      formData.append('occupation', s.occupation)
+      formData.append('speech_condition', s.speech_condition)
 
       const resp = await fetch(`${API_BASE}/collections/recordings/records`, {
         method: 'POST',
