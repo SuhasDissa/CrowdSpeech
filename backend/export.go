@@ -66,13 +66,23 @@ func handleExport(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 			return err
 		}
 		cw := csv.NewWriter(csvFile)
-		_ = cw.Write([]string{"id", "language", "keyword_id", "keyword_en", "audio_file", "duration", "created"})
+		_ = cw.Write([]string{"id", "language", "keyword_id", "keyword_en", "keyword_display", "audio_file", "duration", "created"})
 
 		for _, rec := range recordings {
 			kwID := rec.GetString("keyword")
-			kwText := ""
+			lang := rec.GetString("language")
+			kwEn := ""
+			kwDisplay := ""
 			if kw, kerr := app.FindRecordById("keywords", kwID); kerr == nil {
-				kwText = kw.GetString("text")
+				kwEn = kw.GetString("text") // canonical English label
+				switch lang {
+				case "si":
+					kwDisplay = kw.GetString("text_si")
+				case "ta":
+					kwDisplay = kw.GetString("text_ta")
+				default:
+					kwDisplay = kwEn
+				}
 			}
 
 			// Prefer processed WAV; fall back to original audio
@@ -100,9 +110,10 @@ func handleExport(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 
 			_ = cw.Write([]string{
 				rec.Id,
-				rec.GetString("language"),
+				lang,
 				kwID,
-				kwText,
+				kwEn,
+				kwDisplay,
 				zipEntryName,
 				fmt.Sprintf("%.2f", rec.GetFloat("duration")),
 				rec.GetDateTime("created").String(),
