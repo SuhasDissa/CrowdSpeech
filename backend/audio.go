@@ -18,9 +18,10 @@ import (
 // batchRunning prevents overlapping batch runs (daily + manual).
 var batchRunning atomic.Bool
 
-// processBatch converts all unprocessed recordings (audio_wav == "") to WAV.
+// processBatch converts recordings to WAV.
+// If force=true, reprocesses all recordings even if audio_wav already exists.
 // Safe to call concurrently — only one run executes at a time.
-func processBatch(app *pocketbase.PocketBase) {
+func processBatch(app *pocketbase.PocketBase, force bool) {
 	if !batchRunning.CompareAndSwap(false, true) {
 		log.Println("batch processor: already running, skipping")
 		return
@@ -35,7 +36,9 @@ func processBatch(app *pocketbase.PocketBase) {
 
 	pending := make([]*core.Record, 0)
 	for _, r := range records {
-		if r.GetString("audio_wav") == "" && r.GetString("audio") != "" {
+		hasAudio := len(r.GetStringSlice("audio")) > 0
+		needsProcessing := force || r.GetString("audio_wav") == ""
+		if hasAudio && needsProcessing {
 			pending = append(pending, r)
 		}
 	}
@@ -45,7 +48,7 @@ func processBatch(app *pocketbase.PocketBase) {
 		return
 	}
 
-	log.Printf("batch processor: processing %d recordings", len(pending))
+	log.Printf("batch processor: processing %d recordings (force=%v)", len(pending), force)
 
 	// Process with limited concurrency (4 parallel ffmpeg jobs)
 	sem := make(chan struct{}, 4)
@@ -120,12 +123,16 @@ func convertToWAV(src, dst string) error {
 		return fmt.Errorf("source file %q not found: %w", src, err)
 	}
 
+	// Trim leading silence, then reverse → trim leading (= trailing) → reverse back.
+	// This preserves natural pauses between words inside the phrase.
 	cmd := exec.Command("ffmpeg",
 		"-y",
 		"-i", src,
 		"-af", strings.Join([]string{
-			"silenceremove=start_periods=1:start_silence=0.1:start_threshold=-50dB" +
-				":stop_periods=1:stop_silence=0.5:stop_threshold=-50dB",
+			"silenceremove=start_periods=1:start_silence=0.1:start_threshold=-45dB",
+			"areverse",
+			"silenceremove=start_periods=1:start_silence=0.3:start_threshold=-45dB",
+			"areverse",
 			"loudnorm=I=-16:TP=-1.5:LRA=11",
 		}, ","),
 		"-ar", "16000",
@@ -142,6 +149,7 @@ func convertToWAV(src, dst string) error {
 }
 
 // handleProcess is an admin endpoint that triggers the batch processor immediately.
+// Pass ?force=true to reprocess all recordings, including already-processed ones.
 func handleProcess(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		if !isAdminAuthed(e) {
@@ -150,7 +158,11 @@ func handleProcess(app *pocketbase.PocketBase) func(e *core.RequestEvent) error 
 		if batchRunning.Load() {
 			return e.JSON(http.StatusConflict, map[string]string{"status": "already running"})
 		}
-		go processBatch(app)
-		return e.JSON(http.StatusAccepted, map[string]string{"status": "batch processing started"})
+		force := e.Request.URL.Query().Get("force") == "true"
+		go processBatch(app, force)
+		return e.JSON(http.StatusAccepted, map[string]string{
+			"status": "batch processing started",
+			"force":  fmt.Sprintf("%v", force),
+		})
 	}
 }

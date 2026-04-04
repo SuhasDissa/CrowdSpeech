@@ -98,7 +98,7 @@ func scheduleDailyProcessing(app *pocketbase.PocketBase) {
 		next := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, time.UTC)
 		time.Sleep(time.Until(next))
 		log.Println("batch processor: starting daily run")
-		processBatch(app)
+		processBatch(app, false)
 	}
 }
 
