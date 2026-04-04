@@ -6,7 +6,7 @@
           <span class="mdi mdi-arrow-left" />
         </button>
         <span class="home-logo">CROWD<strong>SPEECH</strong></span>
-        <span class="lang-badge">{{ LANGUAGES[language]?.label ?? language }}</span>
+        <span class="lang-badge">{{ LANGUAGES[language as Language]?.label ?? language }}</span>
       </div>
     </header>
 
