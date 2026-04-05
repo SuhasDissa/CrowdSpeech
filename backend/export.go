@@ -60,18 +60,17 @@ func handleExport(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 		zw := zip.NewWriter(e.Response)
 		defer zw.Close()
 
-		// CSV metadata writer
-		csvFile, err := zw.Create("metadata.csv")
-		if err != nil {
-			return err
-		}
-		cw := csv.NewWriter(csvFile)
-		_ = cw.Write([]string{
+		// Collect CSV rows while adding audio files to the zip.
+		// The CSV entry must be written last because each zw.Create/CreateHeader call
+		// closes the previously open zip entry — writing CSV rows interleaved with
+		// audio entries would leave the CSV empty.
+		header := []string{
 			"id", "language", "keyword_id", "keyword_en", "keyword_display",
 			"audio_file", "duration", "created",
 			"age_group", "gender", "country", "primary_language", "accent",
 			"region", "education", "years_speaking", "occupation", "speech_condition",
-		})
+		}
+		csvRows := [][]string{header}
 
 		for _, rec := range recordings {
 			kwID := rec.GetString("keyword")
@@ -116,7 +115,7 @@ func handleExport(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 				zipEntryName = "(pending ffmpeg processing)"
 			}
 
-			_ = cw.Write([]string{
+			csvRows = append(csvRows, []string{
 				rec.Id,
 				recLang,
 				kwID,
@@ -138,6 +137,15 @@ func handleExport(app *pocketbase.PocketBase) func(e *core.RequestEvent) error {
 			})
 		}
 
+		// Write the CSV entry after all audio entries are finalised.
+		csvFile, err := zw.Create("metadata.csv")
+		if err != nil {
+			return err
+		}
+		cw := csv.NewWriter(csvFile)
+		for _, row := range csvRows {
+			_ = cw.Write(row)
+		}
 		cw.Flush()
 		return nil
 	}
