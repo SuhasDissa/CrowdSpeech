@@ -15,6 +15,7 @@ export interface SurveyAnswers {
 }
 
 const STORAGE_KEY = 'crowdspeech_survey'
+const SESSION_DONE_PREFIX = 'crowdspeech_survey_done_'
 
 function loadFromStorage(): Partial<SurveyAnswers> {
   try {
@@ -23,6 +24,14 @@ function loadFromStorage(): Partial<SurveyAnswers> {
   } catch {
     return {}
   }
+}
+
+export function isCompletedForLanguage(language: string): boolean {
+  return sessionStorage.getItem(SESSION_DONE_PREFIX + language) === '1'
+}
+
+export function markCompletedForLanguage(language: string): void {
+  sessionStorage.setItem(SESSION_DONE_PREFIX + language, '1')
 }
 
 export const SURVEY_OPTIONS: Record<keyof SurveyAnswers, string[]> = {

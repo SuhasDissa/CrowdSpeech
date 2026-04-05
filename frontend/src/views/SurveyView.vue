@@ -64,7 +64,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { LANGUAGES, type Language } from '@/stores/language'
-import { useSurveyStore, SURVEY_OPTIONS, SURVEY_LABELS, type SurveyAnswers } from '@/stores/survey'
+import { useSurveyStore, SURVEY_OPTIONS, SURVEY_LABELS, markCompletedForLanguage, type SurveyAnswers } from '@/stores/survey'
 
 const props = defineProps<{ language: string }>()
 const router = useRouter()
@@ -76,6 +76,7 @@ const submitted = ref(false)
 function onSubmit() {
   submitted.value = true
   if (!store.completed) return
+  markCompletedForLanguage(props.language)
   router.push({ name: 'contribute', params: { language: props.language as Language } })
 }
 </script>
