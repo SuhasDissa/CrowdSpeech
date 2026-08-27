@@ -64,13 +64,13 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { LANGUAGES, type Language } from '@/stores/language'
-import { useSurveyStore, SURVEY_OPTIONS, SURVEY_LABELS, markCompletedForLanguage, type SurveyAnswers } from '@/stores/survey'
+import { useSurveyStore, SURVEY_OPTIONS, SURVEY_LABELS, VISIBLE_SURVEY_FIELDS, markCompletedForLanguage } from '@/stores/survey'
 
 const props = defineProps<{ language: string }>()
 const router = useRouter()
 const store = useSurveyStore()
 
-const SURVEY_FIELDS = Object.keys(SURVEY_LABELS) as (keyof SurveyAnswers)[]
+const SURVEY_FIELDS = VISIBLE_SURVEY_FIELDS
 const submitted = ref(false)
 
 function onSubmit() {

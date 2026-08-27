@@ -36,7 +36,7 @@ export function markCompletedForLanguage(language: string): void {
 
 export const SURVEY_OPTIONS: Record<keyof SurveyAnswers, string[]> = {
   age_group: ['Under 18', '18–24', '25–34', '35–44', '45–54', '55–64', '65+', 'Prefer not to say'],
-  gender: ['Male', 'Female', 'Non-binary', 'Prefer not to say'],
+  gender: ['Male', 'Female'],
   country: [
     'Sri Lanka', 'India', 'Bangladesh', 'Pakistan', 'Nepal', 'Maldives',
     'United Kingdom', 'United States', 'Canada', 'Australia',
@@ -79,35 +79,55 @@ export const SURVEY_LABELS: Record<keyof SurveyAnswers, string> = {
   speech_condition: 'Speech condition',
 }
 
+/** Only these fields are shown and required on the survey form. */
+export const VISIBLE_SURVEY_FIELDS: (keyof SurveyAnswers)[] = ['gender', 'primary_language']
+
+const HIDDEN_DEFAULTS: Pick<SurveyAnswers, 'age_group' | 'country' | 'accent'> = {
+  age_group: '18–24',
+  country: 'Sri Lanka',
+  accent: 'Sri Lankan',
+}
+
+function pickVisible(saved: Partial<SurveyAnswers>, field: keyof SurveyAnswers): string {
+  const value = saved[field] ?? ''
+  return SURVEY_OPTIONS[field].includes(value) ? value : ''
+}
+
+function withHiddenDefaults(visible: Pick<SurveyAnswers, 'gender' | 'primary_language'>): SurveyAnswers {
+  return {
+    ...HIDDEN_DEFAULTS,
+    gender: visible.gender,
+    primary_language: visible.primary_language,
+    region: '',
+    education: '',
+    years_speaking: '',
+    occupation: '',
+    speech_condition: '',
+  }
+}
+
+function isComplete(answers: SurveyAnswers): boolean {
+  return VISIBLE_SURVEY_FIELDS.every(field => answers[field] !== '')
+}
+
 export const useSurveyStore = defineStore('survey', () => {
   const saved = loadFromStorage()
 
-  const answers = ref<SurveyAnswers>({
-    age_group: saved.age_group ?? '',
-    gender: saved.gender ?? '',
-    country: saved.country ?? '',
-    primary_language: saved.primary_language ?? '',
-    accent: saved.accent ?? '',
-    region: saved.region ?? '',
-    education: saved.education ?? '',
-    years_speaking: saved.years_speaking ?? '',
-    occupation: saved.occupation ?? '',
-    speech_condition: saved.speech_condition ?? '',
-  })
+  const answers = ref<SurveyAnswers>(withHiddenDefaults({
+    gender: pickVisible(saved, 'gender'),
+    primary_language: pickVisible(saved, 'primary_language'),
+  }))
 
-  const completed = ref(
-    Object.values(answers.value).every(v => v !== '')
-  )
+  const completed = ref(isComplete(answers.value))
 
   // Persist to localStorage whenever answers change
   watch(answers, (val) => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(val))
-    completed.value = Object.values(val).every(v => v !== '')
+    completed.value = isComplete(val)
   }, { deep: true })
 
   function reset() {
-    const keys = Object.keys(answers.value) as (keyof SurveyAnswers)[]
-    keys.forEach(k => { answers.value[k] = '' })
+    Object.assign(answers.value, withHiddenDefaults({ gender: '', primary_language: '' }))
     completed.value = false
     localStorage.removeItem(STORAGE_KEY)
   }
